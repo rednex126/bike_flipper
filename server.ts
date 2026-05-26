@@ -8,7 +8,7 @@ import { BicycleListing, BenchmarkPrice, TelegramConfig, ScoringParams } from '.
 const app = express();
 app.use(express.json());
 
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 // Active state in memory
 let benchmarkPrices: BenchmarkPrice[] = [...INITIAL_BENCHMARK_PRICES];
