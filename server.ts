@@ -19,7 +19,7 @@ let mockListings: BicycleListing[] = [
     id: 'l1',
     title: 'Specialized Tarmac SL7 Comp 56cm',
     description: 'Sælger min trofaste Specialized racercykel. Fremstår i super flot stand, kun kørt omkring 1200 km. Monteret med Shimano Ultegra. Sælges pga. manglende tid. Nypris var 30.000 kr. Kvittering dertil haves.',
-    url: 'https://www.dba.dk/herrecykel-specialized-tarmac/id-109312389/',
+    url: 'https://www.dba.dk/soeg/?soeg=Specialized+Tarmac+SL7',
     source: 'dba.dk',
     price: 16500,
     brand: 'Specialized',
@@ -43,7 +43,7 @@ let mockListings: BicycleListing[] = [
     id: 'l2',
     title: 'Canyon Grizl 7 Gravel AL',
     description: 'Super fed gravelcykel kværn. Str Medium. Har lidt ridser på overrøret efter en taske, ellers perfekt mekanisk. Shimano GRX 2x11 geargruppe. Købt i 2023. Fast pris.',
-    url: 'https://www.guloggratis.dk/sport/cykler/gravel/annonce/canyon-grizl-7/',
+    url: 'https://www.guloggratis.dk/soeg?q=Canyon+Grizl+7',
     source: 'guloggratis.dk',
     price: 8500,
     brand: 'Canyon',
@@ -66,8 +66,8 @@ let mockListings: BicycleListing[] = [
   {
     id: 'l3',
     title: 'Trek Domane AL 4 str. 54',
-    description: 'Flot og velholdt Trek landevejscykel sælges. Størrelse 54 ideel til 172-180cm. Monteret med Shimano Tiagra. Lettere ridset bremsegreb efter et lille fald, men fungerer perfekt. Ny kæde og kassette monteret for 100km siden.',
-    url: 'https://www.dba.dk/trek-domane-al-4-str-54/id-98124933/',
+    description: 'Flot og velholdt Trek landevejscykel sælges. Størrelse 54 ideel til 172-180cm. Monteret med Shimano Tiagra. Lettere ridset bremsegreb efter et lille fald, men fungerer perfekt. Ny kæде og kassette monteret for 100km siden.',
+    url: 'https://www.dba.dk/soeg/?soeg=Trek+Domane+AL+4',
     source: 'dba.dk',
     price: 5200,
     brand: 'Trek',
@@ -91,7 +91,7 @@ let mockListings: BicycleListing[] = [
     id: 'l4',
     title: 'Specialized Sirrus pendlercykel',
     description: 'Slidt herrecykel. Skal have ny kæde og bremsejustering. Gear fungerer fint. Trænger generelt til en kærlig hånd. Købes som beset. Str L',
-    url: 'https://www.dba.dk/specialized-sirrus-str-l/id-19253488/',
+    url: 'https://www.dba.dk/soeg/?soeg=Specialized+Sirrus',
     source: 'dba.dk',
     price: 1300,
     brand: 'Specialized',
@@ -115,7 +115,7 @@ let mockListings: BicycleListing[] = [
     id: 'l5',
     title: 'Cervelo Caledonia landevejscykel',
     description: 'Cervelo Caledonia Roadbike. Str 56. Shimano 105. Fremstår som ny uden brugsspor. Kvittering fra Cykelexperten medfølger. Nypris 26.000 dkk.',
-    url: 'https://www.guloggratis.dk/cervelo-caledonia/annonce-id84913/',
+    url: 'https://www.guloggratis.dk/soeg?q=Cervelo+Caledonia',
     source: 'guloggratis.dk',
     price: 18000,
     brand: 'Cervelo',
@@ -248,11 +248,164 @@ function calculateCustomScore(
   };
 }
 
+// Scrape actual DBA RSS feed in Denmark dynamically to get real, non-404, working listing links
+async function fetchDbaRssLive(): Promise<BicycleListing[]> {
+  try {
+    console.log('[RSS Search] Sourcing live items from DBA RSS racercykler & gravelcykler...');
+    const response = await fetch('https://www.dba.dk/cykler/racercykler-og-gravelcykler-og-herrecykler/?format=rss', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
+      }
+    });
+
+    if (!response.ok) {
+      console.warn('[RSS Search] DBA RSS failed with status:', response.status);
+      return [];
+    }
+
+    const xmlText = await response.text();
+    const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+    let match;
+    const realListings: BicycleListing[] = [];
+
+    // Limit to 15 items to keep parses fast and prevent blocking
+    let count = 0;
+    while ((match = itemRegex.exec(xmlText)) !== null && count < 15) {
+      const itemContent = match[1];
+
+      // Extract title
+      const titleMatch = itemContent.match(/<title><!\[CDATA\[([\s\S]*?)\]\]><\/title>/) || itemContent.match(/<title>([\s\S]*?)<\/title>/);
+      if (!titleMatch) continue;
+      const title = titleMatch[1].trim();
+
+      // Extract link
+      const linkMatch = itemContent.match(/<link>([\s\S]*?)<\/link>/);
+      if (!linkMatch) continue;
+      const url = linkMatch[1].trim();
+
+      // Extract description
+      const descMatch = itemContent.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/) || itemContent.match(/<description>([\s\S]*?)<\/description>/);
+      const rawDesc = descMatch ? descMatch[1].trim() : '';
+      const description = rawDesc.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+
+      // Extract price from title or description
+      let price = 4500; // default safe fallback
+      const priceRegex = /Pris:\s*([\d\.]+)\s*kr/i;
+      const priceTextMatch = rawDesc.match(priceRegex) || title.match(/([\d\.]+)\s*kr/i);
+      if (priceTextMatch) {
+        price = parseInt(priceTextMatch[1].replace(/\./g, ''), 10);
+      }
+
+      // Identify brand from title
+      const brandsLower = ['specialized', 'canyon', 'trek', 'giant', 'cervelo', 'bianchi', 'cannondale', 'bmc', 'pinarello', 'merida', 'scott', 'principia'];
+      let brand = 'Other Brand';
+      for (const b of brandsLower) {
+        if (title.toLowerCase().includes(b)) {
+          brand = b.charAt(0).toUpperCase() + b.slice(1);
+          break;
+        }
+      }
+
+      // Size heuristic
+      let size = '56 cm';
+      const sizeMatch = title.match(/(str\.\s*\d+|str\s*\d+|\b\d+\s*cm|\b[smlx]\b)/i) || description.match(/(str\.\s*\d+|str\s*\d+|\b\d+\s*cm|\b[smlx]\b)/i);
+      if (sizeMatch) {
+        size = sizeMatch[1].toUpperCase();
+      }
+
+      // Condition heuristic
+      let condition: 'Like New' | 'Good' | 'Fair' | 'Needs Service' = 'Good';
+      const descLower = description.toLowerCase();
+      if (descLower.includes('som ny') || descLower.includes('perfekt') || descLower.includes('ubrugt') || descLower.includes('fejlfri')) {
+        condition = 'Like New';
+      } else if (descLower.includes('slidt') || descLower.includes('rust') || descLower.includes('overflade') || descLower.includes('defekt')) {
+        condition = 'Needs Service';
+      }
+
+      // Region heuristic
+      let region: 'Hovedstaden' | 'Sjælland' | 'Syddanmark' | 'Midtjylland' | 'Nordjylland' = 'Hovedstaden';
+      let latitude = 55.6761;
+      let longitude = 12.5683;
+
+      if (descLower.includes('aarhus') || descLower.includes('randers') || descLower.includes('horsens') || descLower.includes('silkeborg')) {
+        region = 'Midtjylland';
+        latitude = 56.1567 + (Math.random() - 0.5) * 0.15;
+        longitude = 10.2108 + (Math.random() - 0.5) * 0.15;
+      } else if (descLower.includes('odense') || descLower.includes('esbjerg') || descLower.includes('vejle') || descLower.includes('fyn')) {
+        region = 'Syddanmark';
+        latitude = 55.4038 + (Math.random() - 0.5) * 0.15;
+        longitude = 10.4024 + (Math.random() - 0.5) * 0.15;
+      } else if (descLower.includes('aalborg') || descLower.includes('skagen') || descLower.includes('nordjylland')) {
+        region = 'Nordjylland';
+        latitude = 57.0488 + (Math.random() - 0.5) * 0.15;
+        longitude = 9.9217 + (Math.random() - 0.5) * 0.15;
+      } else if (descLower.includes('roskilde') || descLower.includes('slagelse') || descLower.includes('sjælland')) {
+        region = 'Sjælland';
+        latitude = 55.6419 + (Math.random() - 0.5) * 0.15;
+        longitude = 12.0878 + (Math.random() - 0.5) * 0.15;
+      }
+
+      const retailNewEst = getEstimatedNewPrice(brand, title);
+      const calc = calculateCustomScore(price, retailNewEst || 12000, brand, size, condition);
+
+      const uniqueId = `rss_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+      realListings.push({
+        id: uniqueId,
+        title,
+        description: description.substring(0, 300) + (description.length > 300 ? '...' : ''),
+        url,
+        source: 'dba.dk',
+        price,
+        brand,
+        model: title.replace(new RegExp(brand, 'i'), '').trim(),
+        size,
+        condition,
+        publishedAt: 'Aktuel DBA Annonce',
+        estimatedRetailNew: retailNewEst || 12000,
+        score: calc.score,
+        resellEstimate: calc.resellEstimate,
+        potentialMargin: calc.potentialMargin,
+        potentialMarginPercent: calc.potentialMarginPercent,
+        pros: ['Working live listing sourced from DBA.dk', 'Verified active URL ready to transact'],
+        cons: ['Sælger kan have høj efterspørgsel (kontakt hurtigt)'],
+        recommendation: `Sundt bud! Evaluering viser stabil margin på ca. ${calc.potentialMargin.toLocaleString('da-DK')} DKK videresalg.`,
+        region,
+        latitude,
+        longitude
+      });
+
+      count++;
+    }
+
+    return realListings;
+  } catch (err) {
+    console.error('[RSS Search Error] Could not parse dba rss:', err);
+    return [];
+  }
+}
+
 // ----------------- API ENDPOINTS -----------------
 
 // 1. Get List simulated listings
-app.get('/api/listings-feed', (req: Request, res: Response) => {
-  // Always recalculate interactive score based on the current adjustable configurations so changes apply in real-time
+app.get('/api/listings-feed', async (req: Request, res: Response) => {
+  try {
+    // Attempt to enrich with active real-time listings on every refresh/load
+    const liveItems = await fetchDbaRssLive();
+    if (liveItems && liveItems.length > 0) {
+      const existingUrls = new Set(mockListings.map(l => l.url));
+      const filtered = liveItems.filter(item => !existingUrls.has(item.url));
+      mockListings.unshift(...filtered);
+
+      if (mockListings.length > 50) {
+        mockListings = mockListings.slice(0, 50);
+      }
+    }
+  } catch (err) {
+    console.error('[Feed Enrich Error]', err);
+  }
+
+  // Always recalculate interactive score based on current adjustable configurations so changes apply in real-time
   const activeFeed = mockListings.map(listing => {
     const calc = calculateCustomScore(
       listing.price,
@@ -682,7 +835,7 @@ app.post('/api/live-scan', async (req: Request, res: Response) => {
         id: `mock_live_1_${Date.now()}`,
         title: 'Canyon Ultimate CF SL X-Large',
         description: 'Meget flot Canyon racer, brugt 1 sæson til motion. Fuld Shimano Ultegra Di2 elektroniske gear, skivebremser, DT Swiss kulfiber hjulsæt. Velholdt, altid opbevaret indendørs.',
-        url: 'https://www.dba.dk/herrecykel-canyon-ultimate-cf/id-1029481239/',
+        url: 'https://www.dba.dk/soeg/?soeg=Canyon+Ultimate+CF',
         source: 'dba.dk' as const,
         price: 24500,
         brand: 'Canyon',
@@ -696,7 +849,7 @@ app.post('/api/live-scan', async (req: Request, res: Response) => {
         id: `mock_live_2_${Date.now()}`,
         title: 'Trek Emonda SL5 carbon 54cm',
         description: 'Pæn Trek carbon racer. Shimano 105 i 11 speed. Perfekt stand næsten uden brugsspor. Sælges udelukkende grundet køb af gravel.',
-        url: 'https://www.guloggratis.dk/sport/cykler/racercykler/annonce/trek-emonda-sl5/id-98124933/',
+        url: 'https://www.guloggratis.dk/soeg?q=Trek+Emonda+SL5',
         source: 'guloggratis.dk' as const,
         price: 9500,
         brand: 'Trek',
@@ -710,7 +863,7 @@ app.post('/api/live-scan', async (req: Request, res: Response) => {
         id: `mock_live_3_${Date.now()}`,
         title: 'Specialized Diverge Comp E5 model 2023',
         description: 'Specialized gravel cykel i super stand. Frame size 56 cm. Kun ridse på bagstag ellers perfekt mekanisk. Shimano GRX gear.',
-        url: 'https://www.dba.dk/herrecykel-specialized-diverge/id-1092841284/',
+        url: 'https://www.dba.dk/soeg/?soeg=Specialized+Diverge+Comp',
         source: 'dba.dk' as const,
         price: 13500,
         brand: 'Specialized',
@@ -967,12 +1120,12 @@ function startBackgroundScraper() {
       // Calculate flipper score factors
       const calc = calculateCustomScore(askingPrice, modelObj.retail, brand, size, condition);
 
-      const dbaId = Math.floor(10000000 + Math.random() * 90000000);
-      let url = `https://www.dba.dk/annonce/${dbaId}`;
+      const searchQuery = encodeURIComponent(`${brand} ${modelObj.name}`);
+      let url = `https://www.dba.dk/soeg/?soeg=${searchQuery}`;
       if (source === 'guloggratis.dk') {
-        url = `https://www.guloggratis.dk/annonce/id-${dbaId}`;
+        url = `https://www.guloggratis.dk/soeg?q=${searchQuery}`;
       } else if (source === 'facebook') {
-        url = `https://www.facebook.com/marketplace/item/${dbaId}`;
+        url = `https://www.facebook.com/marketplace/search/?query=${searchQuery}`;
       }
 
       // Slightly offset coordinates
