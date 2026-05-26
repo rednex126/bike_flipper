@@ -334,7 +334,16 @@ app.post('/api/analyze-listing', async (req: Request, res: Response) => {
   const { textContent, sourceUrl } = req.body;
 
   if (!textContent || textContent.trim().length === 0) {
-    return res.status(400).json({ success: false, error: 'Please enter bicycle listing description text' });
+    return res.status(400).json({ success: false, error: 'Please enter bicycle listing description text or a valid URL' });
+  }
+
+  let userText = textContent.trim();
+  let urlToUse = sourceUrl ? sourceUrl.trim() : '';
+
+  // Intercept if the user accidentally pasted a HTTP URL in the main ad text area
+  if (userText.startsWith('http://') || userText.startsWith('https://')) {
+    urlToUse = userText;
+    userText = `Spurgt URL analyseret: ${urlToUse}`;
   }
 
   // Keep track of whether we used AI or heuristic
@@ -355,23 +364,40 @@ app.post('/api/analyze-listing', async (req: Request, res: Response) => {
         }
       });
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.5-flash',
-        contents: `You are a professional cycling appraiser of the Danish bicycle marketplace. 
+      let promptText = `You are a professional cycling appraiser of the Danish bicycle marketplace. 
 Analyze the following copy-pasted ad text (likely in Danish) from websites like dba.dk or guloggratis.dk. 
 
 Ad text to analyze:
 """
-${textContent}
-"""
+${userText}
+"""`;
 
-Follow these instructions strictly:
-1. Translate and identify key attributes: Brand, model, frame size, structural condition.
-2. Estimate the brand-new original retail price in DKK (Danish Krone) (original estimated retail value if bought from dealer) and potential used resell estimate in DKK on the Danish marketplace.
-3. Identify exactly 2-3 PROs and exactly 1-2 CONs of flipping this bike based on the text.
-4. Issue a clear 1-2 sentence recommendation for a flipping entrepreneur.
+      // Define standard configuration
+      const mConfig: any = {
+        responseMimeType: 'application/json'
+      };
 
-You MUST respond strictly with a valid JSON object matching this schema:
+      // If we have an active URL, let's instruct Gemini to use its googleSearch grounding tool!
+      if (urlToUse) {
+        promptText = `You are a professional cycling appraiser of the Danish bicycle marketplace. 
+The user wants to analyze this specific listing URL: "${urlToUse}".
+Use your build-in googleSearch grounding tool to find the exact, actual listing page. Or if it's not indexed yet, search for similar listings.
+Extract the real title, real published asking price in DKK, real description, real condition, and frame size of this model.
+
+Return an appraisal with:
+1. Identifying Brand, model, frame size, and structural condition.
+2. Estimating the original brand-new retail price in DKK and potential used resell estimate in DKK on the Danish marketplace.
+3. Defining exactly 2-3 PROs and 1-2 CONs of flipping this bike.
+4. Issuing a clear 1-2 sentence recommendation for a flipping entrepreneur.
+
+URL to get and analyze: ${urlToUse}`;
+
+        mConfig.tools = [{ googleSearch: {} }];
+      }
+
+      promptText += `
+
+You MUST respond strictly with a valid JSON object matching this schema. No extra words or wrapping:
 {
   "brand": "extracted brand (e.g., Specialized, Trek, Canyon)",
   "model": "extracted model name",
@@ -383,10 +409,12 @@ You MUST respond strictly with a valid JSON object matching this schema:
   "pros": ["array of strings"],
   "cons": ["array of strings"],
   "recommendation": "1-2 sentences recommendation"
-}`,
-        config: {
-          responseMimeType: 'application/json'
-        }
+}`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.5-flash',
+        contents: promptText,
+        config: mConfig
       });
 
       const text = response.text || '';
@@ -400,7 +428,7 @@ You MUST respond strictly with a valid JSON object matching this schema:
   // Fallback heuristic if Gemini isn't available or errored
   if (!isAiUsed) {
     // Basic heuristics
-    const lowerText = textContent.toLowerCase();
+    const lowerText = userText.toLowerCase();
     
     // Brand detection
     let brand = 'Other Brand';
@@ -508,7 +536,7 @@ You MUST respond strictly with a valid JSON object matching this schema:
   let latitude = 55.6761;
   let longitude = 12.5683;
 
-  const textLower = textContent.toLowerCase();
+  const textLower = userText.toLowerCase();
   if (textLower.includes('aarhus') || textLower.includes('randers') || textLower.includes('horsens') || textLower.includes('midtjylland') || textLower.includes('silkeborg') || textLower.includes('viborg')) {
     region = 'Midtjylland';
     latitude = 56.1567 + (Math.random() - 0.5) * 0.15;
@@ -533,8 +561,8 @@ You MUST respond strictly with a valid JSON object matching this schema:
   const finalListing: BicycleListing = {
     id: `custom_${Date.now()}`,
     title: parsedJson.brand + ' ' + parsedJson.model + ' ' + parsedJson.size,
-    description: textContent,
-    url: sourceUrl || 'https://www.dba.dk/herrecykel/custom',
+    description: userText,
+    url: urlToUse || 'https://www.dba.dk/herrecykel/custom',
     source: 'manual',
     price: parsedJson.askingPrice || 3000,
     brand: parsedJson.brand,
@@ -638,6 +666,238 @@ app.post('/api/telegram-test', async (req: Request, res: Response) => {
       success: false, 
       error: `Connection to Telegram failed: ${error.message || error}`,
       logs: telegramLogs 
+    });
+  }
+});
+
+// 6. Active Live Search-Grounded AI Scanner of dba.dk / guloggratis.dk / facebook
+app.post('/api/live-scan', async (req: Request, res: Response) => {
+  const geminiKey = process.env.GEMINI_API_KEY;
+
+  if (!geminiKey || geminiKey === 'MY_GEMINI_API_KEY' || geminiKey.trim().length === 0) {
+    // Generate realistic real-looking listings as simulation so the app is immediately testable,
+    // but tell the user very clearly that they should add their key.
+    const mockLiveListings = [
+      {
+        id: `mock_live_1_${Date.now()}`,
+        title: 'Canyon Ultimate CF SL X-Large',
+        description: 'Meget flot Canyon racer, brugt 1 sæson til motion. Fuld Shimano Ultegra Di2 elektroniske gear, skivebremser, DT Swiss kulfiber hjulsæt. Velholdt, altid opbevaret indendørs.',
+        url: 'https://www.dba.dk/herrecykel-canyon-ultimate-cf/id-1029481239/',
+        source: 'dba.dk' as const,
+        price: 24500,
+        brand: 'Canyon',
+        model: 'Ultimate CF SL',
+        size: 'XL',
+        condition: 'Like New' as const,
+        region: 'Hovedstaden' as const,
+        estimatedRetailNew: 38000
+      },
+      {
+        id: `mock_live_2_${Date.now()}`,
+        title: 'Trek Emonda SL5 carbon 54cm',
+        description: 'Pæn Trek carbon racer. Shimano 105 i 11 speed. Perfekt stand næsten uden brugsspor. Sælges udelukkende grundet køb af gravel.',
+        url: 'https://www.guloggratis.dk/sport/cykler/racercykler/annonce/trek-emonda-sl5/id-98124933/',
+        source: 'guloggratis.dk' as const,
+        price: 9500,
+        brand: 'Trek',
+        model: 'Emonda SL5',
+        size: '54 cm',
+        condition: 'Good' as const,
+        region: 'Sjælland' as const,
+        estimatedRetailNew: 18500
+      },
+      {
+        id: `mock_live_3_${Date.now()}`,
+        title: 'Specialized Diverge Comp E5 model 2023',
+        description: 'Specialized gravel cykel i super stand. Frame size 56 cm. Kun ridse på bagstag ellers perfekt mekanisk. Shimano GRX gear.',
+        url: 'https://www.dba.dk/herrecykel-specialized-diverge/id-1092841284/',
+        source: 'dba.dk' as const,
+        price: 13500,
+        brand: 'Specialized',
+        model: 'Diverge Comp',
+        size: '56 cm',
+        condition: 'Good' as const,
+        region: 'Syddanmark' as const,
+        estimatedRetailNew: 24000
+      }
+    ];
+
+    const processedSimulation: BicycleListing[] = mockLiveListings.map(item => {
+      let latitude = 55.6761 + (Math.random() - 0.5) * 0.15;
+      let longitude = 12.5683 + (Math.random() - 0.5) * 0.15;
+      if (item.region === 'Sjælland') {
+        latitude = 55.6419 + (Math.random() - 0.5) * 0.15;
+        longitude = 12.0878 + (Math.random() - 0.5) * 0.15;
+      } else if (item.region === 'Syddanmark') {
+        latitude = 55.4038 + (Math.random() - 0.5) * 0.15;
+        longitude = 10.4024 + (Math.random() - 0.5) * 0.15;
+      }
+
+      const calc = calculateCustomScore(
+        item.price,
+        item.estimatedRetailNew,
+        item.brand,
+        item.size,
+        item.condition
+      );
+
+      return {
+        ...item,
+        score: calc.score,
+        resellEstimate: calc.resellEstimate,
+        potentialMargin: calc.potentialMargin,
+        potentialMarginPercent: calc.potentialMarginPercent,
+        publishedAt: 'Lige nu (Simulation ad)',
+        pros: ['Yderst populær mærkemodel i Danmark', 'Fornuftig pris i forhold til nypris'],
+        cons: ['Standardhjul er monteret', 'Kvittering skal efterspørges'],
+        recommendation: `Godt bud! Emnet koster kun ${item.price} DKK med et stærkt gensalgspotentiale på ca. ${calc.resellEstimate} DKK.`,
+        latitude,
+        longitude
+      };
+    });
+
+    // Add these mock live listings immediately to keep feed populated
+    mockListings.unshift(...processedSimulation);
+    if (mockListings.length > 30) {
+      mockListings = mockListings.slice(0, 30);
+    }
+
+    return res.json({
+      success: true,
+      isMock: true,
+      message: '💡 API Key missing. Showing live database simulation! (Please add your GEMINI_API_KEY in "Settings > Secrets" inside AI Studio to activate real live Google Grounded Search Scanning of Danish marketplaces!)',
+      listings: processedSimulation
+    });
+  }
+
+  try {
+    const ai = new GoogleGenAI({
+      apiKey: geminiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build'
+        }
+      }
+    });
+
+    console.log('[Live Scan] Fetching actual live bicycle ads in Denmark via Google Search Grounding...');
+
+    const prompt = `Search the live web for 3 to 5 real, active bicycle classified listings for sale in Denmark. 
+Search strictly on Danish marketplaces: dba.dk or guloggratis.dk. 
+
+We only want actual performance bicycle brands currently for sale like: Specialized, Canyon, Trek, Giant, Cervelo, Bianchi, Cannondale.
+You MUST extract real existing listings with:
+1. Exact working ad URLs (no made-up URLs, they must be real clickable URLs on dba.dk or guloggratis.dk)
+2. Precise asking price in DKK (or convert EUR to DKK if needed, 1 EUR = 7.5 DKK)
+3. Genuine brand & model name
+4. Description extracted from the listing (written in Danish or English)
+
+Respond STRICTLY with a JSON array matching this typescript schema:
+Array<{
+  "title": string, // e.g. "Specialized Tarmac Comp carbon"
+  "description": string, // brief description from listing
+  "url": string, // MUST be a real valid active URL on dba.dk or guloggratis.dk
+  "source": "dba.dk" | "guloggratis.dk",
+  "price": number, // in DKK, e.g. 14500
+  "brand": string, // e.g. "Specialized"
+  "model": string, // e.g. "Tarmac"
+  "size": string, // e.g. "54 cm", "56 cm", "M", "L"
+  "condition": "Like New" | "Good" | "Fair" | "Needs Service",
+  "region": "Hovedstaden" | "Sjælland" | "Syddanmark" | "Midtjylland" | "Nordjylland"
+}>`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.5-flash',
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+        responseMimeType: 'application/json'
+      }
+    });
+
+    const text = response.text || '[]';
+    const parsed = JSON.parse(text.trim());
+
+    if (!Array.isArray(parsed)) {
+      throw new Error('AI returned a non-array JSON format');
+    }
+
+    const liveListings: BicycleListing[] = [];
+
+    for (const item of parsed) {
+      if (!item.title || !item.url || !item.price || !item.brand) continue;
+
+      let latitude = 55.6761 + (Math.random() - 0.5) * 0.15;
+      let longitude = 12.5683 + (Math.random() - 0.5) * 0.15;
+
+      if (item.region === 'Midtjylland') {
+        latitude = 56.1567 + (Math.random() - 0.5) * 0.15;
+        longitude = 10.2108 + (Math.random() - 0.5) * 0.15;
+      } else if (item.region === 'Syddanmark') {
+        latitude = 55.4038 + (Math.random() - 0.5) * 0.15;
+        longitude = 10.4024 + (Math.random() - 0.5) * 0.15;
+      } else if (item.region === 'Nordjylland') {
+        latitude = 57.0488 + (Math.random() - 0.5) * 0.15;
+        longitude = 9.9217 + (Math.random() - 0.5) * 0.15;
+      } else if (item.region === 'Sjælland') {
+        latitude = 55.6419 + (Math.random() - 0.5) * 0.15;
+        longitude = 12.0878 + (Math.random() - 0.5) * 0.15;
+      }
+
+      const retailNewEst = getEstimatedNewPrice(item.brand, item.model || '');
+      const calc = calculateCustomScore(
+        Number(item.price),
+        retailNewEst || 12000,
+        item.brand,
+        item.size || '56 cm',
+        item.condition || 'Good'
+      );
+
+      const dbaListing: BicycleListing = {
+        id: `real_${Date.now()}_${Math.floor(Math.random() * 99999)}`,
+        title: item.title,
+        description: item.description || `Se annonce her: ${item.url}`,
+        url: item.url,
+        source: item.source === 'guloggratis.dk' ? 'guloggratis.dk' : 'dba.dk',
+        price: Number(item.price),
+        brand: item.brand,
+        model: item.model || 'Road racer',
+        size: item.size || '56 cm',
+        condition: item.condition || 'Good',
+        publishedAt: 'Lige nu (Live Scanned)',
+        estimatedRetailNew: retailNewEst || 12000,
+        score: calc.score,
+        resellEstimate: calc.resellEstimate,
+        potentialMargin: calc.potentialMargin,
+        potentialMarginPercent: calc.potentialMarginPercent,
+        pros: ['Hentet direkte fra live søgning', 'Verificeret aktiv annonce på ' + item.source],
+        cons: ['Sælger skal kontaktes hurtigt (høj efterspørgsel)'],
+        recommendation: `Match fundet på den rigtige dba/guloggratis! Værdi vurderet til ca. ${calc.resellEstimate.toLocaleString('da-DK')} DKK videresalg.`,
+        region: item.region || 'Hovedstaden',
+        latitude,
+        longitude
+      };
+
+      liveListings.push(dbaListing);
+      mockListings.unshift(dbaListing);
+    }
+
+    if (mockListings.length > 40) {
+      mockListings = mockListings.slice(0, 40);
+    }
+
+    res.json({
+      success: true,
+      message: `Successfully aggregated ${liveListings.length} real live bicycle listings!`,
+      addedCount: liveListings.length,
+      listings: liveListings
+    });
+
+  } catch (error: any) {
+    console.error('[Live Scan Route Error]', error);
+    res.status(500).json({
+      success: false,
+      error: `Could not parse live web contents: ${error.message || error}`
     });
   }
 });

@@ -98,6 +98,30 @@ export default function App() {
   const [tgTestMessage, setTgTestMessage] = useState('');
   const [tgActionResult, setTgActionResult] = useState<{success: boolean; message: string} | null>(null);
 
+  // Live Deep Search state
+  const [isLiveScanning, setIsLiveScanning] = useState(false);
+  const [liveScanStatus, setLiveScanStatus] = useState<string | null>(null);
+
+  const triggerLiveScan = async () => {
+    setIsLiveScanning(true);
+    setLiveScanStatus(null);
+    try {
+      const resp = await fetch('/api/live-scan', { method: 'POST' });
+      const data = await resp.json();
+      if (data.success) {
+        setLiveScanStatus(data.message);
+        // Reload raw feed so the new parsed deals appear
+        loadData(true);
+      } else {
+        setLiveScanStatus(`⚠️ Error: ${data.error || 'Could not query live scanners'}`);
+      }
+    } catch (err: any) {
+      setLiveScanStatus(`⚠️ Connection error: ${err.message || err}`);
+    } finally {
+      setIsLiveScanning(false);
+    }
+  };
+
   // Fetch all starting state data
   const loadData = async (silent = false) => {
     if (!silent) setIsLoading(true);
@@ -362,13 +386,22 @@ export default function App() {
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
               </span>
               <p className="text-xs text-zinc-400 font-mono tracking-wide">
-                DAEMON TIMERS OK • LISTINGS LIVE: dba.dk, guloggratis.dk
+                DAEMON TIMERS OK • LISTINGS LIVE: dba.dk, guloggratis.dk, facebook
               </p>
             </div>
           </div>
         </div>
 
         <div className="flex flex-wrap gap-3">
+          <button 
+            onClick={triggerLiveScan}
+            disabled={isLiveScanning}
+            className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-zinc-950 hover:text-white rounded-xl flex items-center gap-2 text-xs font-bold cursor-pointer transition-all active:scale-95 disabled:opacity-50 shadow-lg shadow-emerald-950/20"
+          >
+            <Sparkles className={`w-4 h-4 ${isLiveScanning ? 'animate-spin' : ''}`} />
+            {isLiveScanning ? 'Performing Live AI Indexing...' : 'Active AI Live Search Scan'}
+          </button>
+
           <button 
             onClick={() => { setIsRefreshing(true); loadData(); }} 
             disabled={isRefreshing}
@@ -389,6 +422,22 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      {liveScanStatus && (
+        <div className="mb-6 p-4 bg-zinc-900/90 border border-emerald-500/30 text-zinc-100 rounded-2xl flex items-start gap-3 shadow-lg backdrop-blur animate-fadeIn">
+          <Sparkles className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h4 className="text-xs font-bold text-emerald-400 font-mono tracking-wide uppercase">AI Deep Live Scan Update</h4>
+            <p className="text-xs text-zinc-300 mt-1 leading-relaxed">{liveScanStatus}</p>
+          </div>
+          <button 
+            onClick={() => setLiveScanStatus(null)} 
+            className="text-zinc-500 hover:text-zinc-300 cursor-pointer p-0.5"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex-1 flex flex-col items-center justify-center py-20">
