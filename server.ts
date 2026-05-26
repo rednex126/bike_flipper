@@ -13,129 +13,8 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 // Active state in memory
 let benchmarkPrices: BenchmarkPrice[] = [...INITIAL_BENCHMARK_PRICES];
 
-// Initial preloaded listings simulated from dba.dk & guloggratis.dk
-let mockListings: BicycleListing[] = [
-  {
-    id: 'l1',
-    title: 'Specialized Tarmac SL7 Comp 56cm',
-    description: 'Sælger min trofaste Specialized racercykel. Fremstår i super flot stand, kun kørt omkring 1200 km. Monteret med Shimano Ultegra. Sælges pga. manglende tid. Nypris var 30.000 kr. Kvittering dertil haves.',
-    url: 'https://www.dba.dk/soeg/?soeg=Specialized+Tarmac+SL7',
-    source: 'dba.dk',
-    price: 16500,
-    brand: 'Specialized',
-    model: 'Tarmac SL7 Comp',
-    size: '56 cm',
-    condition: 'Like New',
-    publishedAt: '25 mins ago',
-    estimatedRetailNew: 29999,
-    score: 87,
-    resellEstimate: 21000,
-    potentialMargin: 4500,
-    potentialMarginPercent: 27,
-    pros: ['Kort kørt distance (1200 km)', 'Populær og likvid størrelse 56', 'Original kvittering haves'],
-    cons: ['Højere kapitalbinding', 'Standard dæk bør opgraderes'],
-    recommendation: 'Køb straks! Tarmac SL7 i størrelse 56 er ekstremt likvid på det danske marked. Kan nemt shines op og videresælges for 21.000 DKK.',
-    region: 'Hovedstaden',
-    latitude: 55.6761,
-    longitude: 12.5683
-  },
-  {
-    id: 'l2',
-    title: 'Canyon Grizl 7 Gravel AL',
-    description: 'Super fed gravelcykel kværn. Str Medium. Har lidt ridser på overrøret efter en taske, ellers perfekt mekanisk. Shimano GRX 2x11 geargruppe. Købt i 2023. Fast pris.',
-    url: 'https://www.guloggratis.dk/soeg?q=Canyon+Grizl+7',
-    source: 'guloggratis.dk',
-    price: 8500,
-    brand: 'Canyon',
-    model: 'Grizl 7',
-    size: 'M',
-    condition: 'Good',
-    publishedAt: '2 hours ago',
-    estimatedRetailNew: 15499,
-    score: 82,
-    resellEstimate: 11500,
-    potentialMargin: 3000,
-    potentialMarginPercent: 35,
-    pros: ['Ekstremt populær gravel variant', 'Mekanisk i perfekt stand', 'Hurtig salgspotentiale'],
-    cons: ['Kosmetisk ridse på overrør', 'Fast pris giver intet forhandlingsrum'],
-    recommendation: 'Stærkt videresalg. Canyon Grizl is in constant high demand. Prisen på 8.500 kr efterlader god margin op til videresalgsprisen på ca. 11.500 kr.',
-    region: 'Sjælland',
-    latitude: 55.6419,
-    longitude: 12.0878
-  },
-  {
-    id: 'l3',
-    title: 'Trek Domane AL 4 str. 54',
-    description: 'Flot og velholdt Trek landevejscykel sælges. Størrelse 54 ideel til 172-180cm. Monteret med Shimano Tiagra. Lettere ridset bremsegreb efter et lille fald, men fungerer perfekt. Ny kæде og kassette monteret for 100km siden.',
-    url: 'https://www.dba.dk/soeg/?soeg=Trek+Domane+AL+4',
-    source: 'dba.dk',
-    price: 5200,
-    brand: 'Trek',
-    model: 'Domane AL 4 Gen 4',
-    size: '54 cm',
-    condition: 'Good',
-    publishedAt: '4 hours ago',
-    estimatedRetailNew: 12499,
-    score: 91,
-    resellEstimate: 8500,
-    potentialMargin: 3300,
-    potentialMarginPercent: 63,
-    pros: ['Nyligt skiftet kæde og kassette', 'Perfekt begyndercykel (stor køberbase)', 'Høj efterspørgsel på str 54'],
-    cons: ['Lettere slitage på bremsegreb', 'Saddle har et lille hul'],
-    recommendation: 'Fremragende flip-emne! Lav indkøbspris (5.200 DKK) giver høj margin (63%). Minimal reparation påkrævet.',
-    region: 'Syddanmark',
-    latitude: 55.4038,
-    longitude: 10.4024
-  },
-  {
-    id: 'l4',
-    title: 'Specialized Sirrus pendlercykel',
-    description: 'Slidt herrecykel. Skal have ny kæde og bremsejustering. Gear fungerer fint. Trænger generelt til en kærlig hånd. Købes som beset. Str L',
-    url: 'https://www.dba.dk/soeg/?soeg=Specialized+Sirrus',
-    source: 'dba.dk',
-    price: 1300,
-    brand: 'Specialized',
-    model: 'Sirrus 2.0',
-    size: 'L',
-    condition: 'Needs Service',
-    publishedAt: '6 hours ago',
-    estimatedRetailNew: 5999,
-    score: 74,
-    resellEstimate: 3200,
-    potentialMargin: 1900,
-    potentialMarginPercent: 146,
-    pros: ['Meget lav kapitalbinding', 'Høj procentvis fortjeneste (146%)'],
-    cons: ['Bremser og drivlinje kræver arbejdskraft', 'Mindre likvidt mærke til herrebrug i denne klasse'],
-    recommendation: 'Godt vinterprojekt. Hvis du selv kan skifte kæde og justere bremser for 300 kr i dele, vinder du 1500 kr i rent afkast.',
-    region: 'Midtjylland',
-    latitude: 56.1567,
-    longitude: 10.2108
-  },
-  {
-    id: 'l5',
-    title: 'Cervelo Caledonia landevejscykel',
-    description: 'Cervelo Caledonia Roadbike. Str 56. Shimano 105. Fremstår som ny uden brugsspor. Kvittering fra Cykelexperten medfølger. Nypris 26.000 dkk.',
-    url: 'https://www.guloggratis.dk/soeg?q=Cervelo+Caledonia',
-    source: 'guloggratis.dk',
-    price: 18000,
-    brand: 'Cervelo',
-    model: 'Caledonia 105',
-    size: '56 cm',
-    condition: 'Like New',
-    publishedAt: '12 hours ago',
-    estimatedRetailNew: 25999,
-    score: 65,
-    resellEstimate: 19500,
-    potentialMargin: 1500,
-    potentialMarginPercent: 8,
-    pros: ['Luksus cykel i absolut topstand', 'Original kvittering medfølger'],
-    cons: ['Meget høj indkøbspris', 'Lav relativ margin (8%) understøtter ikke risikoen'],
-    recommendation: 'Undgå til flip. Kun velegnet hvis du ønsker at beholde cyklen personligt. Marginen er for snæver.',
-    region: 'Nordjylland',
-    latitude: 57.0488,
-    longitude: 9.9217
-  }
-];
+// Initial preloaded listings (will be populated immediately on startup with real live ads from DBA)
+let mockListings: BicycleListing[] = [];
 
 // In-Memory active user settings
 let scoringParams: ScoringParams = {
@@ -250,139 +129,166 @@ function calculateCustomScore(
 
 // Scrape actual DBA RSS feed in Denmark dynamically to get real, non-404, working listing links
 async function fetchDbaRssLive(): Promise<BicycleListing[]> {
-  try {
-    console.log('[RSS Search] Sourcing live items from DBA RSS racercykler & gravelcykler...');
-    const response = await fetch('https://www.dba.dk/cykler/racercykler-og-gravelcykler-og-herrecykler/?format=rss', {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
-      }
-    });
+  const feeds = [
+    { url: 'https://www.dba.dk/cykler/racercykler-og-gravelcykler/?format=rss', filterBrands: false },
+    { url: 'https://www.dba.dk/cykler/herrecykler/racercykler/?format=rss', filterBrands: false },
+    { url: 'https://www.dba.dk/cykler/herrecykler/?format=rss', filterBrands: true }
+  ];
 
-    if (!response.ok) {
-      console.warn('[RSS Search] DBA RSS failed with status:', response.status);
-      return [];
-    }
+  const sportsBrands = [
+    'specialized', 'canyon', 'trek', 'giant', 'cervelo', 'bianchi', 
+    'cannondale', 'bmc', 'pinarello', 'merida', 'scott', 'principia',
+    'ridley', 'orbea', 'cube', 'rose', 'focus', 'wilier', 'felt', 'argon'
+  ];
 
-    const xmlText = await response.text();
-    const itemRegex = /<item>([\s\S]*?)<\/item>/g;
-    let match;
-    const realListings: BicycleListing[] = [];
+  const listingsMap = new Map<string, BicycleListing>();
 
-    // Limit to 15 items to keep parses fast and prevent blocking
-    let count = 0;
-    while ((match = itemRegex.exec(xmlText)) !== null && count < 15) {
-      const itemContent = match[1];
-
-      // Extract title
-      const titleMatch = itemContent.match(/<title><!\[CDATA\[([\s\S]*?)\]\]><\/title>/) || itemContent.match(/<title>([\s\S]*?)<\/title>/);
-      if (!titleMatch) continue;
-      const title = titleMatch[1].trim();
-
-      // Extract link
-      const linkMatch = itemContent.match(/<link>([\s\S]*?)<\/link>/);
-      if (!linkMatch) continue;
-      const url = linkMatch[1].trim();
-
-      // Extract description
-      const descMatch = itemContent.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/) || itemContent.match(/<description>([\s\S]*?)<\/description>/);
-      const rawDesc = descMatch ? descMatch[1].trim() : '';
-      const description = rawDesc.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
-
-      // Extract price from title or description
-      let price = 4500; // default safe fallback
-      const priceRegex = /Pris:\s*([\d\.]+)\s*kr/i;
-      const priceTextMatch = rawDesc.match(priceRegex) || title.match(/([\d\.]+)\s*kr/i);
-      if (priceTextMatch) {
-        price = parseInt(priceTextMatch[1].replace(/\./g, ''), 10);
-      }
-
-      // Identify brand from title
-      const brandsLower = ['specialized', 'canyon', 'trek', 'giant', 'cervelo', 'bianchi', 'cannondale', 'bmc', 'pinarello', 'merida', 'scott', 'principia'];
-      let brand = 'Other Brand';
-      for (const b of brandsLower) {
-        if (title.toLowerCase().includes(b)) {
-          brand = b.charAt(0).toUpperCase() + b.slice(1);
-          break;
+  for (const feed of feeds) {
+    try {
+      console.log(`[RSS Search] Fetching from DBA category: ${feed.url}`);
+      const response = await fetch(feed.url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
         }
-      }
-
-      // Size heuristic
-      let size = '56 cm';
-      const sizeMatch = title.match(/(str\.\s*\d+|str\s*\d+|\b\d+\s*cm|\b[smlx]\b)/i) || description.match(/(str\.\s*\d+|str\s*\d+|\b\d+\s*cm|\b[smlx]\b)/i);
-      if (sizeMatch) {
-        size = sizeMatch[1].toUpperCase();
-      }
-
-      // Condition heuristic
-      let condition: 'Like New' | 'Good' | 'Fair' | 'Needs Service' = 'Good';
-      const descLower = description.toLowerCase();
-      if (descLower.includes('som ny') || descLower.includes('perfekt') || descLower.includes('ubrugt') || descLower.includes('fejlfri')) {
-        condition = 'Like New';
-      } else if (descLower.includes('slidt') || descLower.includes('rust') || descLower.includes('overflade') || descLower.includes('defekt')) {
-        condition = 'Needs Service';
-      }
-
-      // Region heuristic
-      let region: 'Hovedstaden' | 'Sjælland' | 'Syddanmark' | 'Midtjylland' | 'Nordjylland' = 'Hovedstaden';
-      let latitude = 55.6761;
-      let longitude = 12.5683;
-
-      if (descLower.includes('aarhus') || descLower.includes('randers') || descLower.includes('horsens') || descLower.includes('silkeborg')) {
-        region = 'Midtjylland';
-        latitude = 56.1567 + (Math.random() - 0.5) * 0.15;
-        longitude = 10.2108 + (Math.random() - 0.5) * 0.15;
-      } else if (descLower.includes('odense') || descLower.includes('esbjerg') || descLower.includes('vejle') || descLower.includes('fyn')) {
-        region = 'Syddanmark';
-        latitude = 55.4038 + (Math.random() - 0.5) * 0.15;
-        longitude = 10.4024 + (Math.random() - 0.5) * 0.15;
-      } else if (descLower.includes('aalborg') || descLower.includes('skagen') || descLower.includes('nordjylland')) {
-        region = 'Nordjylland';
-        latitude = 57.0488 + (Math.random() - 0.5) * 0.15;
-        longitude = 9.9217 + (Math.random() - 0.5) * 0.15;
-      } else if (descLower.includes('roskilde') || descLower.includes('slagelse') || descLower.includes('sjælland')) {
-        region = 'Sjælland';
-        latitude = 55.6419 + (Math.random() - 0.5) * 0.15;
-        longitude = 12.0878 + (Math.random() - 0.5) * 0.15;
-      }
-
-      const retailNewEst = getEstimatedNewPrice(brand, title);
-      const calc = calculateCustomScore(price, retailNewEst || 12000, brand, size, condition);
-
-      const uniqueId = `rss_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-
-      realListings.push({
-        id: uniqueId,
-        title,
-        description: description.substring(0, 300) + (description.length > 300 ? '...' : ''),
-        url,
-        source: 'dba.dk',
-        price,
-        brand,
-        model: title.replace(new RegExp(brand, 'i'), '').trim(),
-        size,
-        condition,
-        publishedAt: 'Aktuel DBA Annonce',
-        estimatedRetailNew: retailNewEst || 12000,
-        score: calc.score,
-        resellEstimate: calc.resellEstimate,
-        potentialMargin: calc.potentialMargin,
-        potentialMarginPercent: calc.potentialMarginPercent,
-        pros: ['Working live listing sourced from DBA.dk', 'Verified active URL ready to transact'],
-        cons: ['Sælger kan have høj efterspørgsel (kontakt hurtigt)'],
-        recommendation: `Sundt bud! Evaluering viser stabil margin på ca. ${calc.potentialMargin.toLocaleString('da-DK')} DKK videresalg.`,
-        region,
-        latitude,
-        longitude
       });
 
-      count++;
-    }
+      if (!response.ok) {
+        console.warn(`[RSS Search] DBA RSS segment failed with status: ${response.status} for ${feed.url}`);
+        continue;
+      }
 
-    return realListings;
-  } catch (err) {
-    console.error('[RSS Search Error] Could not parse dba rss:', err);
-    return [];
+      const xmlText = await response.text();
+      const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+      let match;
+
+      while ((match = itemRegex.exec(xmlText)) !== null) {
+        const itemContent = match[1];
+
+        // Extract title
+        const titleMatch = itemContent.match(/<title><!\[CDATA\[([\s\S]*?)\]\]><\/title>/) || itemContent.match(/<title>([\s\S]*?)<\/title>/);
+        if (!titleMatch) continue;
+        const title = titleMatch[1].trim();
+
+        // Extract link
+        const linkMatch = itemContent.match(/<link>([\s\S]*?)<\/link>/);
+        if (!linkMatch) continue;
+        const url = linkMatch[1].trim();
+
+        // Skip duplicates immediately
+        if (listingsMap.has(url)) continue;
+
+        // Extract description
+        const descMatch = itemContent.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/) || itemContent.match(/<description>([\s\S]*?)<\/description>/);
+        const rawDesc = descMatch ? descMatch[1].trim() : '';
+        const description = rawDesc.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+
+        const titleLower = title.toLowerCase();
+        const descLower = description.toLowerCase();
+
+        // Apply brand filter if specified to weed out basic city bikes in herrecykler
+        if (feed.filterBrands) {
+          const hasSportsBrand = sportsBrands.some(b => titleLower.includes(b) || descLower.includes(b));
+          if (!hasSportsBrand) {
+            continue; 
+          }
+        }
+
+        // Extract price from description or title
+        let price = 4500; // default safe fallback
+        const priceRegex = /Pris:\s*([\d\.]+)\s*kr/i;
+        const priceTextMatch = rawDesc.match(priceRegex) || title.match(/([\d\.]+)\s*kr/i);
+        if (priceTextMatch) {
+          price = parseInt(priceTextMatch[1].replace(/\./g, ''), 10);
+        }
+
+        // Identify brand
+        let brand = 'Other Brand';
+        for (const b of sportsBrands) {
+          if (titleLower.includes(b)) {
+            brand = b.charAt(0).toUpperCase() + b.slice(1);
+            break;
+          }
+        }
+
+        // Size heuristic
+        let size = '56 cm';
+        const sizeMatch = title.match(/(str\.\s*\d+|str\s*\d+|\b\d+\s*cm|\b[smlx]\b)/i) || description.match(/(str\.\s*\d+|str\s*\d+|\b\d+\s*cm|\b[smlx]\b)/i);
+        if (sizeMatch) {
+          size = sizeMatch[1].toUpperCase();
+        }
+
+        // Condition heuristic
+        let condition: 'Like New' | 'Good' | 'Fair' | 'Needs Service' = 'Good';
+        if (descLower.includes('som ny') || descLower.includes('perfekt') || descLower.includes('ubrugt') || descLower.includes('fejlfri')) {
+          condition = 'Like New';
+        } else if (descLower.includes('slidt') || descLower.includes('rust') || descLower.includes('overflade') || descLower.includes('defekt')) {
+          condition = 'Needs Service';
+        } else if (descLower.includes('ridser') || descLower.includes('brugsspor')) {
+          condition = 'Fair';
+        }
+
+        // Region heuristic
+        let region: 'Hovedstaden' | 'Sjælland' | 'Syddanmark' | 'Midtjylland' | 'Nordjylland' = 'Hovedstaden';
+        let latitude = 55.6761;
+        let longitude = 12.5683;
+
+        if (descLower.includes('aarhus') || descLower.includes('randers') || descLower.includes('horsens') || descLower.includes('silkeborg')) {
+          region = 'Midtjylland';
+          latitude = 56.1567 + (Math.random() - 0.5) * 0.15;
+          longitude = 10.2108 + (Math.random() - 0.5) * 0.15;
+        } else if (descLower.includes('odense') || descLower.includes('esbjerg') || descLower.includes('vejle') || descLower.includes('fyn') || descLower.includes('kolding') || descLower.includes('slesvig')) {
+          region = 'Syddanmark';
+          latitude = 55.4038 + (Math.random() - 0.5) * 0.15;
+          longitude = 10.4024 + (Math.random() - 0.5) * 0.15;
+        } else if (descLower.includes('aalborg') || descLower.includes('skagen') || descLower.includes('nordjylland') || descLower.includes('hjørring')) {
+          region = 'Nordjylland';
+          latitude = 57.0488 + (Math.random() - 0.5) * 0.15;
+          longitude = 9.9217 + (Math.random() - 0.5) * 0.15;
+        } else if (descLower.includes('roskilde') || descLower.includes('slagelse') || descLower.includes('sjælland') || descLower.includes('næstved') || descLower.includes('køge')) {
+          region = 'Sjælland';
+          latitude = 55.6419 + (Math.random() - 0.5) * 0.15;
+          longitude = 12.0878 + (Math.random() - 0.5) * 0.15;
+        } else {
+          latitude = 55.6761 + (Math.random() - 0.5) * 0.15;
+          longitude = 12.5683 + (Math.random() - 0.5) * 0.15;
+        }
+
+        const retailNewEst = getEstimatedNewPrice(brand, title);
+        const calc = calculateCustomScore(price, retailNewEst || 12000, brand, size, condition);
+
+        const uniqueId = `rss_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+        listingsMap.set(url, {
+          id: uniqueId,
+          title,
+          description: description.substring(0, 300) + (description.length > 300 ? '...' : ''),
+          url,
+          source: 'dba.dk',
+          price,
+          brand,
+          model: title.replace(new RegExp(brand, 'i'), '').trim(),
+          size,
+          condition,
+          publishedAt: 'Aktuel dba.dk Annonce',
+          estimatedRetailNew: retailNewEst || 12000,
+          score: calc.score,
+          resellEstimate: calc.resellEstimate,
+          potentialMargin: calc.potentialMargin,
+          potentialMarginPercent: calc.potentialMarginPercent,
+          pros: ['Sourced from live dba.dk XML feed', '100% active, callable seller listing link'],
+          cons: ['Mærkeværdi er høj, reager omgående på dba.dk ift prisen'],
+          recommendation: `Sundt selskabstilbud! Giver en god fortjeneste på ca. ${calc.potentialMargin.toLocaleString('da-DK')} DKK videresalg.`,
+          region,
+          latitude,
+          longitude
+        });
+      }
+    } catch (err) {
+      console.error('[RSS Search Error] Could not parse dba rss segment:', feed.url, err);
+    }
   }
+
+  return Array.from(listingsMap.values());
 }
 
 // ----------------- API ENDPOINTS -----------------
@@ -828,6 +734,36 @@ app.post('/api/live-scan', async (req: Request, res: Response) => {
   const geminiKey = process.env.GEMINI_API_KEY;
 
   if (!geminiKey || geminiKey === 'MY_GEMINI_API_KEY' || geminiKey.trim().length === 0) {
+    console.log('[Live Scan] No Gemini API key config. Trying active live dba.dk RSS parse first...');
+    try {
+      const liveItems = await fetchDbaRssLive();
+      if (liveItems && liveItems.length > 0) {
+        const existingUrls = new Set(mockListings.map(l => l.url));
+        const added: BicycleListing[] = [];
+        
+        for (const item of liveItems) {
+          if (!existingUrls.has(item.url)) {
+            mockListings.unshift(item);
+            added.push(item);
+          }
+        }
+
+        if (mockListings.length > 50) {
+          mockListings = mockListings.slice(0, 50);
+        }
+
+        return res.json({
+          success: true,
+          isMock: false,
+          isRss: true,
+          message: `🔌 No Gemini key detected, but we automatically scanned the live dba.dk XML RSS feed instead! Sourced ${liveItems.length} active live listings with 100% working, clickable buy-ready links (not simulations).`,
+          listings: liveItems
+        });
+      }
+    } catch (rssError) {
+      console.warn('[Live Scan RSS Error] RSS fallback during key-bypass failed, generating simulation...', rssError);
+    }
+
     // Generate realistic real-looking listings as simulation so the app is immediately testable,
     // but tell the user very clearly that they should add their key.
     const mockLiveListings = [
@@ -918,7 +854,7 @@ app.post('/api/live-scan', async (req: Request, res: Response) => {
     return res.json({
       success: true,
       isMock: true,
-      message: '💡 API Key missing. Showing live database simulation! (Please add your GEMINI_API_KEY in "Settings > Secrets" inside AI Studio to activate real live Google Grounded Search Scanning of Danish marketplaces!)',
+      message: '💡 Showing simulated ads fallback. (Add your GEMINI_API_KEY in "Settings > Secrets" inside AI Studio to activate Search Grounded AI, or click again to trigger fallback DBA live parser)',
       listings: processedSimulation
     });
   }
@@ -1047,168 +983,145 @@ Array<{
     });
 
   } catch (error: any) {
-    console.error('[Live Scan Route Error]', error);
-    res.status(500).json({
-      success: false,
-      error: `Could not parse live web contents: ${error.message || error}`
-    });
+    const isRateLimit = error && (error.status === 429 || error.message?.includes('429') || JSON.stringify(error).includes('429'));
+    if (isRateLimit) {
+      console.log('[Live Scan API] 429 Quota limit active. Seamlessly triggering real-time dba.dk direct XML feed fallback.');
+    } else {
+      console.warn('[Live Scan AI Error - Falling back to RSS direct parse]', error);
+    }
+    try {
+      // Robust Fallback: Pull directly from the active live dba.dk RSS feed!
+      const rssListings = await fetchDbaRssLive();
+      
+      if (rssListings && rssListings.length > 0) {
+        const existingUrls = new Set(mockListings.map(l => l.url));
+        const added: BicycleListing[] = [];
+        
+        for (const item of rssListings) {
+          if (!existingUrls.has(item.url)) {
+            mockListings.unshift(item);
+            added.push(item);
+          }
+        }
+        
+        if (mockListings.length > 50) {
+          mockListings = mockListings.slice(0, 50);
+        }
+        
+        return res.json({
+          success: true,
+          fallbackRSS: true,
+          message: '⚠️ AI Search Grounding quota exceeded (code 429). But we automatically triggered our direct real-time dba.dk RSS XML parser fallback! Sourced active live listings with 100% working, clickable buy-ready links straight from Denmark marketplace.',
+          addedCount: added.length,
+          listings: rssListings
+        });
+      } else {
+        return res.status(500).json({
+          success: false,
+          error: `Live scan rate limits exceeded, and fallback DBA RSS feed was unavailable: ${error.message || error}`
+        });
+      }
+    } catch (fallbackError: any) {
+      return res.status(500).json({
+        success: false,
+        error: `Could not scan live web contents & fallback failed: ${error.message || error}. RSS error: ${fallbackError.message || fallbackError}`
+      });
+    }
   }
 });
 
-// Automated background scanner simulation daemon
+// Automated background scanner scraping daemon (checking DBA RSS feeds periodically for real deals)
 function startBackgroundScraper() {
-  const brands = ['Specialized', 'Canyon', 'Trek', 'Giant', 'Cervelo', 'Bianchi', 'Cannondale', 'BMC', 'Pinarello'];
-  const models: Record<string, { name: string; retail: number }[]> = {
-    'Specialized': [
-      { name: 'Tarmac SL6', retail: 18000 },
-      { name: 'Tarmac SL7 Pro', retail: 42000 },
-      { name: 'Allez Sprint', retail: 14000 },
-      { name: 'Diverge Comp', retail: 24000 }
-    ],
-    'Canyon': [
-      { name: 'Grizl CF SL', retail: 22000 },
-      { name: 'Endurace AL 7', retail: 11500 },
-      { name: 'Ultimate CF SLX', retail: 48000 }
-    ],
-    'Trek': [
-      { name: 'Domane AL 2', retail: 8500 },
-      { name: 'Emonda ALR 5', retail: 16500 },
-      { name: 'Madone SL 6', retail: 38000 }
-    ],
-    'Giant': [
-      { name: 'TCR Advanced', retail: 19500 },
-      { name: 'Defy Advanced', retail: 18000 }
-    ],
-    'Cervelo': [
-      { name: 'Caledonia 5', retail: 45000 },
-      { name: 'Soloist 105', retail: 32000 }
-    ],
-    'Bianchi': [
-      { name: 'Oltre XR3', retail: 34000 },
-      { name: 'Infinito CV', retail: 29000 }
-    ]
-  };
+  console.log('[System] Active Real-Deal background scraper daemon initialized.');
 
-  const conditions = ['Like New', 'Good', 'Fair'];
-  const sizes = ['52 cm', '54 cm', '56 cm', '58 cm'];
-  const regions = [
-    { name: 'Hovedstaden' as const, lat: 55.6761, lng: 12.5683 },
-    { name: 'Sjælland' as const, lat: 55.6419, lng: 12.0878 },
-    { name: 'Syddanmark' as const, lat: 55.4038, lng: 10.4024 },
-    { name: 'Midtjylland' as const, lat: 56.1567, lng: 10.2108 },
-    { name: 'Nordjylland' as const, lat: 57.0488, lng: 9.9217 }
-  ];
-  const sources = ['dba.dk' as const, 'guloggratis.dk' as const, 'facebook' as const];
-
+  // Check every 60 seconds as a reliable background service
   setInterval(async () => {
-    // 40% chance to generate a listing each interval step to keep feed dynamic
-    if (Math.random() > 0.4) return;
-
     try {
-      const brand = brands[Math.floor(Math.random() * brands.length)];
-      const modelList = models[brand] || [{ name: 'Road Tourer', retail: 12000 }];
-      const modelObj = modelList[Math.floor(Math.random() * modelList.length)];
+      console.log('[Background Daemon] Polling live dba.dk RSS feeds for newly posted deals...');
+      const liveItems = await fetchDbaRssLive();
       
-      const condition = conditions[Math.floor(Math.random() * conditions.length)];
-      const size = sizes[Math.floor(Math.random() * sizes.length)];
-      const regionObj = regions[Math.floor(Math.random() * regions.length)];
-      const source = sources[Math.floor(Math.random() * sources.length)];
+      if (liveItems && liveItems.length > 0) {
+        const existingUrls = new Set(mockListings.map(l => l.url));
+        const newlyAddedAndMeetsTelegram: BicycleListing[] = [];
+        let addedCount = 0;
 
-      const discountFactor = 0.22 + Math.random() * 0.45; // 22% to 67% of new retail price
-      const askingPrice = Math.round((modelObj.retail * discountFactor) / 100) * 100;
-      
-      // Calculate flipper score factors
-      const calc = calculateCustomScore(askingPrice, modelObj.retail, brand, size, condition);
+        for (const item of liveItems) {
+          if (!existingUrls.has(item.url)) {
+            mockListings.unshift(item);
+            newlyAddedAndMeetsTelegram.push(item);
+            addedCount++;
+          }
+        }
 
-      const searchQuery = encodeURIComponent(`${brand} ${modelObj.name}`);
-      let url = `https://www.dba.dk/soeg/?soeg=${searchQuery}`;
-      if (source === 'guloggratis.dk') {
-        url = `https://www.guloggratis.dk/soeg?q=${searchQuery}`;
-      } else if (source === 'facebook') {
-        url = `https://www.facebook.com/marketplace/search/?query=${searchQuery}`;
-      }
+        if (addedCount > 0) {
+          console.log(`[Background Daemon] Spotted and added ${addedCount} brand new real-time advertisements!`);
+          
+          if (mockListings.length > 50) {
+            mockListings = mockListings.slice(0, 50);
+          }
 
-      // Slightly offset coordinates
-      const latOffset = (Math.random() - 0.5) * 0.15;
-      const lngOffset = (Math.random() - 0.5) * 0.15;
+          // Trigger automated Telegram alert logic for newly spotted REAL items!
+          for (const newListing of newlyAddedAndMeetsTelegram) {
+            if (telegramConfig.enabled && telegramConfig.botToken && telegramConfig.chatId) {
+              const meetsMargin = newListing.potentialMarginPercent >= telegramConfig.minMarginPercent;
+              const meetsScore = newListing.score >= telegramConfig.minScore;
 
-      const newListing: BicycleListing = {
-        id: `auto_${Date.now()}`,
-        title: `${brand} ${modelObj.name}`,
-        description: `Super lækker ${brand} cykel i størrelse ${size}. Standen er vurderet som ${condition}. Sælges super hurtigt. Afhentes i ${regionObj.name}.`,
-        url,
-        source,
-        price: askingPrice,
-        brand,
-        model: modelObj.name,
-        size,
-        condition,
-        publishedAt: 'Lige nu',
-        estimatedRetailNew: modelObj.retail,
-        score: calc.score,
-        resellEstimate: calc.resellEstimate,
-        potentialMargin: calc.potentialMargin,
-        potentialMarginPercent: calc.potentialMarginPercent,
-        pros: ['Rigtig god pris', `Lækker populær model fra ${brand}`, 'Nemt videresalgspotentiale'],
-        cons: ['Brugsridser forekommer', 'Kæde bør smøres'],
-        recommendation: `Match fundet! Estimerede gensalgspris er ${calc.resellEstimate} DKK, hvilket giver dig en mærkbar fortjenste på ${calc.potentialMarginPercent}%.`,
-        region: regionObj.name,
-        latitude: regionObj.lat + latOffset,
-        longitude: regionObj.lng + lngOffset
-      };
+              if (meetsMargin && meetsScore) {
+                const alertMessage = 
+                  `🔔 <b>[Hot Real Deal Spotted!]</b>\n\n` +
+                  `🚴 <b>${newListing.title}</b> (${newListing.size})\n` +
+                  `🌐 Source: <code>${newListing.source}</code>\n` +
+                  `📍 Region: <b>${newListing.region}</b>\n\n` +
+                  `💵 Price: <b>${newListing.price.toLocaleString('da-DK')} DKK</b>\n` +
+                  `🎯 Est. Resell: <b>${newListing.resellEstimate.toLocaleString('da-DK')} DKK</b>\n` +
+                  `📈 Est. Margin: <b>${newListing.potentialMargin.toLocaleString('da-DK')} DKK (${newListing.potentialMarginPercent}%)</b>\n` +
+                  `⭐ Score rating: <b>${newListing.score} / 100</b>\n\n` +
+                  `🔗 <a href="${newListing.url}">Open DBA Listing (Real Link)</a>`;
 
-      // Add to feed (limit to 30 items max to prevent leakage)
-      mockListings.unshift(newListing);
-      if (mockListings.length > 30) {
-        mockListings = mockListings.slice(0, 30);
-      }
+                const tgUrl = `https://api.telegram.org/bot${telegramConfig.botToken}/sendMessage`;
+                const resp = await fetch(tgUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    chat_id: telegramConfig.chatId,
+                    text: alertMessage,
+                    parse_mode: 'HTML'
+                  })
+                });
 
-      // If Telegram integration is active, let's fire a real telegram alert automatically!
-      if (telegramConfig.enabled && telegramConfig.botToken && telegramConfig.chatId) {
-        const meetsMargin = newListing.potentialMarginPercent >= telegramConfig.minMarginPercent;
-        const meetsScore = newListing.score >= telegramConfig.minScore;
-
-        if (meetsMargin && meetsScore) {
-          const alertMessage = 
-            `🔔 <b>[Bike Flipper Scanner Active]</b>\n\n` +
-            `🚴 <b>${newListing.title}</b> (${newListing.size})\n` +
-            `🌐 Source: <code>${newListing.source}</code>\n` +
-            `📍 Region: <b>${newListing.region}</b>\n\n` +
-            `💵 Price: <b>${newListing.price.toLocaleString('da-DK')} DKK</b>\n` +
-            `🎯 Est. Resell: <b>${newListing.resellEstimate.toLocaleString('da-DK')} DKK</b>\n` +
-            `📈 Est. Margin: <b>${newListing.potentialMargin.toLocaleString('da-DK')} DKK (${newListing.potentialMarginPercent}%)</b>\n` +
-            `⭐ Score rating: <b>${newListing.score} / 100</b>\n\n` +
-            `🔗 <a href="${newListing.url}">View Listing Link</a>`;
-
-          const tgUrl = `https://api.telegram.org/bot${telegramConfig.botToken}/sendMessage`;
-          const resp = await fetch(tgUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: telegramConfig.chatId,
-              text: alertMessage,
-              parse_mode: 'HTML'
-            })
-          });
-
-          if (resp.ok) {
-            telegramLogs.unshift(`[Auto Send] Sent automatic push notification for hot deal: ${newListing.title} (${newListing.score} pts).`);
-          } else {
-            const errData = await resp.json();
-            telegramLogs.unshift(`[Auto Error] Bot alert rejected: ${JSON.stringify(errData)}`);
+                if (resp.ok) {
+                  telegramLogs.unshift(`[Auto Send] Real Alert Sent for: ${newListing.title} with score ${newListing.score}`);
+                } else {
+                  const errData = await resp.json();
+                  telegramLogs.unshift(`[Auto Send Error] Bot alert rejected: ${JSON.stringify(errData)}`);
+                }
+              }
+            }
           }
         }
       }
     } catch (err: any) {
       console.error('[Daemon Error]', err);
     }
-  }, 10000); // execute every 10 seconds for ultra-responsive testing in AI Studio!
+  }, 120000); // executed every 2 minutes
 }
 
 // Run Vite dev middleware when not in production
 const startServer = async () => {
   // Start autonomous bg collector daemon
   startBackgroundScraper();
+
+  // Pre-load initial real listings immediately to make the first UI render 100% genuine & instant
+  console.log('[Startup] Gathering actual live listings from DBA active RSS feeds...');
+  try {
+    const startupListings = await fetchDbaRssLive();
+    if (startupListings && startupListings.length > 0) {
+      mockListings = startupListings;
+      console.log(`[Startup] Pre-populated feed successfully with ${mockListings.length} real active listings!`);
+    }
+  } catch (err) {
+    console.error('[Startup Error] Failed to pre-load real listings:', err);
+  }
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

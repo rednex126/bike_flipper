@@ -1036,9 +1036,9 @@ export default function App() {
                                   href={listing.url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="p-1 px-2.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded-lg hover:text-white border border-zinc-850 flex items-center gap-1.5 text-[10px] font-bold transition-all transition-colors"
+                                  className="p-1 px-3 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white rounded-lg border-none flex items-center gap-1.5 text-[10px] font-black transition-all transition-colors shadow-lg shadow-emerald-950/20"
                                 >
-                                  Source Ad
+                                  Åbn Annonce
                                   <ExternalLink className="w-3 h-3" />
                                 </a>
                               )}
