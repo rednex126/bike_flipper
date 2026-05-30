@@ -22,6 +22,7 @@ export interface BicycleListing {
   region: 'Hovedstaden' | 'Sjælland' | 'Syddanmark' | 'Midtjylland' | 'Nordjylland';
   latitude: number;
   longitude: number;
+  category: 'Road' | 'Gravel' | 'MTB' | 'Sports' | 'Other';
 }
 
 export interface BenchmarkPrice {

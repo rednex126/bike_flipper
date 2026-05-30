@@ -62,6 +62,7 @@ export default function App() {
   const [activeFilterSource, setActiveFilterSource] = useState('All');
   const [activeFilterRegion, setActiveFilterRegion] = useState('All');
   const [activeFilterRadius, setActiveFilterRadius] = useState<number>(0); // 0 means no limit
+  const [activeFilterCategory, setActiveFilterCategory] = useState('All');
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number }>({ lat: 55.6761, lng: 12.5683 });
   const [userCoordsLabel, setUserCoordsLabel] = useState('Copenhagen (Default)');
   const [gpsError, setGpsError] = useState<string | null>(null);
@@ -97,6 +98,10 @@ export default function App() {
   const [isTestingTg, setIsTestingTg] = useState(false);
   const [tgTestMessage, setTgTestMessage] = useState('');
   const [tgActionResult, setTgActionResult] = useState<{success: boolean; message: string} | null>(null);
+
+  // Facebook Groups state
+  const [facebookGroups, setFacebookGroups] = useState<string[]>([]);
+  const [newFbGroup, setNewFbGroup] = useState('');
 
   // Live Deep Search state
   const [isLiveScanning, setIsLiveScanning] = useState(false);
@@ -154,6 +159,13 @@ export default function App() {
         setTelegramConfig(tgData.config);
         setTgForm(tgData.config);
         setTgLogs(tgData.logs);
+      }
+
+      // Fetch Facebook Groups
+      const fbGroupsResp = await fetch('/api/facebook-groups');
+      const fbGroupsData = await fbGroupsResp.json();
+      if (fbGroupsData.success) {
+        setFacebookGroups(fbGroupsData.groups);
       }
     } catch (e) {
       console.error('Failed to load endpoints from backup or custom server:', e);
@@ -339,6 +351,43 @@ export default function App() {
     }
   };
 
+  const handleAddFbGroup = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!newFbGroup.trim()) return;
+    const next = [...facebookGroups, newFbGroup.trim()];
+    try {
+      const resp = await fetch('/api/facebook-groups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ groups: next })
+      });
+      const data = await resp.json();
+      if (data.success) {
+        setFacebookGroups(data.groups);
+        setNewFbGroup('');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleRemoveFbGroup = async (url: string) => {
+    const next = facebookGroups.filter(g => g !== url);
+    try {
+      const resp = await fetch('/api/facebook-groups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ groups: next })
+      });
+      const data = await resp.json();
+      if (data.success) {
+        setFacebookGroups(data.groups);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   // Helper counters
   const totalArbitrageMargin = listings.reduce((sum, item) => {
     // Sum only positive margins of deals with good scores (>60)
@@ -353,6 +402,9 @@ export default function App() {
     if (activeFilterBrand !== 'All' && item.brand.toLowerCase() !== activeFilterBrand.toLowerCase()) return false;
     if (item.score < activeFilterMinScore) return false;
     if (activeFilterSource !== 'All' && item.source !== activeFilterSource) return false;
+    
+    // Category Filter
+    if (activeFilterCategory !== 'All' && item.category !== activeFilterCategory) return false;
     
     // Region Filter
     if (activeFilterRegion !== 'All' && item.region !== activeFilterRegion) return false;
@@ -669,24 +721,43 @@ export default function App() {
                 </div>
 
                 {/* Filters */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="text-[10px] font-bold uppercase text-zinc-500 mr-1">Filter brand:</div>
-                  <div className="inline-flex rounded-lg bg-zinc-950 p-1 border border-zinc-800">
-                    <button
-                      onClick={() => setActiveFilterBrand('All')}
-                      className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-all ${activeFilterBrand === 'All' ? 'bg-zinc-850 text-white' : 'text-zinc-400 hover:text-white'}`}
-                    >
-                      All
-                    </button>
-                    {matchedBrandNames.map(b => (
+                <div className="flex flex-col xl:flex-row items-start xl:items-center gap-4 max-w-full mt-3">
+                  {/* Brand Filter */}
+                  <div className="flex flex-wrap items-center gap-2 max-w-full">
+                    <div className="text-[10px] font-bold uppercase text-zinc-500 mr-1">Filter brand:</div>
+                    <div className="flex flex-wrap rounded-xl bg-zinc-950 p-1 border border-zinc-800 max-w-full gap-1">
                       <button
-                        key={b}
-                        onClick={() => setActiveFilterBrand(b)}
-                        className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-all ${activeFilterBrand === b ? 'bg-zinc-850 text-white' : 'text-zinc-400 hover:text-white'}`}
+                        onClick={() => setActiveFilterBrand('All')}
+                        className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-all cursor-pointer ${activeFilterBrand === 'All' ? 'bg-zinc-850 text-white' : 'text-zinc-400 hover:text-white'}`}
                       >
-                        {b}
+                        All
                       </button>
-                    ))}
+                      {matchedBrandNames.map(b => (
+                        <button
+                          key={b}
+                          onClick={() => setActiveFilterBrand(b)}
+                          className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-all cursor-pointer ${activeFilterBrand === b ? 'bg-zinc-850 text-white' : 'text-zinc-400 hover:text-white'}`}
+                        >
+                          {b}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Category Filter */}
+                  <div className="flex flex-wrap items-center gap-2 max-w-full">
+                    <div className="text-[10px] font-bold uppercase text-zinc-500 mr-1">Bike Category:</div>
+                    <div className="flex flex-wrap rounded-xl bg-zinc-950 p-1 border border-zinc-800 max-w-full gap-1">
+                      {['All', 'Road', 'Gravel', 'MTB', 'Sports'].map(cat => (
+                        <button
+                          key={cat}
+                          onClick={() => setActiveFilterCategory(cat)}
+                          className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-all cursor-pointer ${activeFilterCategory === cat ? 'bg-zinc-850 text-white' : 'text-zinc-400 hover:text-white'}`}
+                        >
+                          {cat === 'All' ? 'All Types' : cat}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -884,109 +955,146 @@ export default function App() {
                         )}
 
                         <div className="flex flex-col md:flex-row justify-between items-start gap-4">
-                          
-                          {/* Left: General data */}
-                          <div className="flex-1 min-w-0">
-                            
-                            {/* Badging row */}
-                            <div className="flex flex-wrap items-center gap-2 mb-2">
-                              {/* Source badge */}
-                              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md border font-mono uppercase ${
-                                listing.source === 'dba.dk' 
-                                  ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' 
-                                  : listing.source === 'guloggratis.dk' 
-                                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                                    : listing.source === 'facebook'
-                                      ? 'bg-sky-500/10 text-sky-400 border-sky-500/20'
-                                      : 'bg-purple-500/10 text-purple-400 border-purple-500/20'
-                              }`}>
-                                {listing.source}
-                              </span>
+                               {/* Left: General data */}
+                          <div className="flex-1 min-w-0 flex gap-4">
+                            {listing.imageUrl && (
+                              <img 
+                                src={listing.imageUrl} 
+                                alt={listing.title}
+                                className="w-20 h-20 md:w-24 md:h-24 object-cover rounded-2xl border border-zinc-900 shrink-0 bg-zinc-900 shadow-md group-hover:scale-105 transition-transform duration-300"
+                              />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              
+                              {/* Badging row */}
+                              <div className="flex flex-wrap items-center gap-2 mb-2">
+                                {/* Source badge */}
+                                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md border font-mono uppercase ${
+                                  listing.source === 'dba.dk' 
+                                    ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' 
+                                    : listing.source === 'guloggratis.dk' 
+                                      ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                                      : listing.source === 'facebook'
+                                        ? 'bg-sky-500/10 text-sky-400 border-sky-500/20'
+                                        : 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                                }`}>
+                                  {listing.source}
+                                </span>
 
-                              {/* Sizing badge */}
-                              <span className="bg-zinc-900 border border-zinc-800 text-zinc-300 font-mono text-[9px] px-2 py-0.5 rounded-md">
-                                Size: <span className="font-bold text-white">{listing.size}</span>
-                              </span>
+                                {/* Sizing badge */}
+                                <span className="bg-zinc-900 border border-zinc-800 text-zinc-300 font-mono text-[9px] px-2 py-0.5 rounded-md">
+                                  Size: <span className="font-bold text-white">{listing.size}</span>
+                                </span>
 
-                              {/* Condition Badge */}
-                              <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-md uppercase ${
-                                listing.condition === 'Like New'
-                                  ? 'bg-emerald-500/10 text-emerald-400'
-                                  : listing.condition === 'Good'
-                                    ? 'bg-zinc-800 text-zinc-200'
-                                    : listing.condition === 'Fair'
-                                      ? 'bg-zinc-900 text-zinc-400'
-                                      : 'bg-rose-500/10 text-rose-400'
-                              }`}>
-                                {listing.condition}
-                              </span>
+                                {/* Condition Badge */}
+                                <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-md uppercase ${
+                                  listing.condition === 'Like New'
+                                    ? 'bg-emerald-500/10 text-emerald-400'
+                                    : listing.condition === 'Good'
+                                      ? 'bg-zinc-800 text-zinc-200'
+                                      : listing.condition === 'Fair'
+                                        ? 'bg-zinc-900 text-zinc-400'
+                                        : 'bg-rose-500/10 text-rose-400'
+                                }`}>
+                                  {listing.condition}
+                                </span>
 
-                              {/* Region & Distance badge */}
-                              <span className="bg-sky-450/10 border border-sky-500/20 text-sky-400 font-mono text-[9px] px-2 py-0.5 rounded-md flex items-center gap-1">
-                                📍 {listing.region || 'Hovedstaden'}
-                                {listing.latitude && listing.longitude && (
-                                  <span className="text-zinc-300 font-bold ml-1 pl-1 border-l border-sky-500/30">
-                                    {calculateDistanceKm(userCoords.lat, userCoords.lng, listing.latitude, listing.longitude)} km away
+                                {/* Category Badge */}
+                                {listing.category && (
+                                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md border font-mono uppercase ${
+                                    listing.category === 'Road' 
+                                      ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' 
+                                      : listing.category === 'Gravel' 
+                                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                        : listing.category === 'MTB'
+                                          ? 'bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20'
+                                          : listing.category === 'Sports'
+                                            ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                                            : 'bg-zinc-800/10 text-zinc-400 border-zinc-800/20'
+                                  }`}>
+                                    {listing.category}
                                   </span>
                                 )}
-                              </span>
 
-                              {/* Age badge */}
-                              <span className="text-[10px] text-zinc-500 ml-auto font-mono">
-                                {listing.publishedAt}
-                              </span>
-                            </div>
+                                {/* Region & Distance badge */}
+                                <span className="bg-sky-450/10 border border-sky-500/20 text-sky-400 font-mono text-[9px] px-2 py-0.5 rounded-md flex items-center gap-1">
+                                  📍 {listing.region || 'Hovedstaden'}
+                                  {listing.latitude && listing.longitude && (
+                                    <span className="text-zinc-300 font-bold ml-1 pl-1 border-l border-sky-500/30">
+                                      {calculateDistanceKm(userCoords.lat, userCoords.lng, listing.latitude, listing.longitude)} km away
+                                    </span>
+                                  )}
+                                </span>
 
-                            {/* Title */}
-                            <h3 className="font-bold text-zinc-200 text-base flex items-center gap-2 group-hover:text-white transition-colors">
-                              {listing.title}
-                              {listing.isCustomScored && (
-                                <span className="text-[10px] bg-purple-950 text-purple-300 border border-purple-800 rounded px-1.5 py-0.2">Gemini Appraised</span>
-                              )}
-                            </h3>
-
-                            {/* Shortened description */}
-                            <p className="text-xs text-zinc-400 mt-1 line-clamp-2 italic pr-4">
-                              "{listing.description}"
-                            </p>
-
-                            {/* Pros & Cons Section */}
-                            <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 pt-3 border-t border-zinc-900">
-                              <div>
-                                <span className="block text-[9px] uppercase font-mono font-bold text-emerald-500 mb-1">PROS OF FLIP:</span>
-                                <ul className="space-y-0.5">
-                                  {listing.pros?.map((pro, i) => (
-                                    <li key={i} className="text-[10px] text-zinc-350 flex items-center gap-1.5">
-                                      <span className="w-1 h-1 rounded-full bg-emerald-500"></span>
-                                      {pro}
-                                    </li>
-                                  ))}
-                                </ul>
+                                {/* Age badge */}
+                                <span className="text-[10px] text-zinc-500 ml-auto font-mono">
+                                  {listing.publishedAt}
+                                </span>
                               </div>
-                              <div>
-                                <span className="block text-[9px] uppercase font-mono font-bold text-zinc-500 mb-1">RISKS & DRAWBACKS:</span>
-                                <ul className="space-y-0.5">
-                                  {listing.cons?.map((con, i) => (
-                                    <li key={i} className="text-[10px] text-zinc-450 flex items-center gap-1.5">
-                                      <span className="w-1 h-1 rounded-full bg-zinc-650"></span>
-                                      {con}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            </div>
 
-                            {/* Recommendation note */}
-                            {listing.recommendation && (
-                              <div className="mt-3 bg-zinc-900/60 rounded-xl p-2.5 border border-zinc-850 flex items-start gap-2 text-[11px] text-zinc-300">
-                                <Info className="w-3.5 h-3.5 text-zinc-400 shrink-0 mt-0.5" />
+                              {/* Title */}
+                              <h3 className="font-bold text-zinc-200 text-base flex items-center gap-2 group-hover:text-white transition-colors">
+                                {listing.title}
+                                {listing.isCustomScored && (
+                                  <span className="text-[10px] bg-purple-950 text-purple-300 border border-purple-800 rounded px-1.5 py-0.2">Gemini Appraised</span>
+                                )}
+                              </h3>
+
+                              {/* Shortened description */}
+                              <p className="text-xs text-zinc-400 mt-1 line-clamp-2 italic pr-4">
+                                "{listing.description}"
+                              </p>
+
+                              {/* Pros & Cons Section */}
+                              <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 pt-3 border-t border-zinc-900">
                                 <div>
-                                  <span className="font-bold text-zinc-450 uppercase text-[9px] block">Strategic Adviser Guidance:</span>
-                                  {listing.recommendation}
+                                  <span className="block text-[9px] uppercase font-mono font-bold text-emerald-500 mb-1">PROS OF FLIP:</span>
+                                  <ul className="space-y-0.5">
+                                    {listing.pros?.filter(pro => !pro.startsWith('Photo score') && !pro.startsWith('Photo feedback')).map((pro, i) => (
+                                      <li key={i} className="text-[10px] text-zinc-350 flex items-center gap-1.5">
+                                        <span className="w-1 h-1 rounded-full bg-emerald-500"></span>
+                                        {pro}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                                <div>
+                                  <span className="block text-[9px] uppercase font-mono font-bold text-zinc-500 mb-1">RISKS & DRAWBACKS:</span>
+                                  <ul className="space-y-0.5">
+                                    {listing.cons?.map((con, i) => (
+                                      <li key={i} className="text-[10px] text-zinc-450 flex items-center gap-1.5">
+                                        <span className="w-1 h-1 rounded-full bg-zinc-650"></span>
+                                        {con}
+                                      </li>
+                                    ))}
+                                  </ul>
                                 </div>
                               </div>
-                            )}
 
+                              {/* Photo Appraisal note */}
+                              {listing.pros?.some(p => p.startsWith('Photo score')) && (
+                                <div className="mt-2.5 bg-zinc-900/40 rounded-xl p-2.5 border border-zinc-850 flex items-start gap-2 text-[11px] text-zinc-300">
+                                  <Sparkles className="w-3.5 h-3.5 text-emerald-450 shrink-0 mt-0.5" />
+                                  <div>
+                                    <span className="font-bold text-zinc-450 uppercase text-[9px] block">AI Listing Photograph Assessment:</span>
+                                    <span className="text-zinc-200">
+                                      <span className="text-emerald-400 font-bold">{listing.pros.find(p => p.startsWith('Photo score'))}</span> — {listing.pros.find(p => p.startsWith('Photo feedback'))?.replace('Photo feedback: ', '')}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Recommendation note */}
+                              {listing.recommendation && (
+                                <div className="mt-3 bg-zinc-900/60 rounded-xl p-2.5 border border-zinc-850 flex items-start gap-2 text-[11px] text-zinc-300">
+                                  <Info className="w-3.5 h-3.5 text-zinc-400 shrink-0 mt-0.5" />
+                                  <div>
+                                    <span className="font-bold text-zinc-450 uppercase text-[9px] block">Strategic Adviser Guidance:</span>
+                                    {listing.recommendation}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           </div>
 
                           {/* Right: Score and Price margins */}
@@ -1283,12 +1391,48 @@ export default function App() {
                       className="w-full py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded text-xs font-bold border border-zinc-700 cursor-pointer disabled:opacity-50"
                     >
                       {isSavingTg ? 'Saving...' : 'Save credentials'}
-                    </button>
-                  </form>
+                    </button>                  </form>
+
+                  {/* Facebook Groups Configuration */}
+                  <div className="space-y-3 p-3.5 bg-zinc-950 rounded-2xl border border-zinc-850 mb-4">
+                    <span className="text-[10px] text-zinc-400 font-bold uppercase block tracking-wider font-mono">Monitored FB Groups:</span>
+                    <form onSubmit={handleAddFbGroup} className="flex gap-2">
+                      <input
+                        type="url"
+                        placeholder="https://www.facebook.com/groups/..."
+                        value={newFbGroup}
+                        onChange={(e) => setNewFbGroup(e.target.value)}
+                        className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-zinc-200 flex-1 placeholder:text-zinc-650 focus:outline-none focus:border-emerald-500"
+                      />
+                      <button
+                        type="submit"
+                        className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1.5 rounded-xl text-xs font-bold border border-zinc-700 flex items-center gap-1 shrink-0 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </form>
+                    <div className="space-y-1.5 max-h-[110px] overflow-y-auto pr-2 custom-scroll">
+                      {facebookGroups.map((g, idx) => (
+                        <div key={idx} className="flex justify-between items-center bg-zinc-900/50 p-2 rounded-lg border border-zinc-850 text-[10px] font-mono">
+                          <span className="truncate text-zinc-400 flex-1 pr-2">{g}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveFbGroup(g)}
+                            className="text-zinc-650 hover:text-rose-450 p-0.5 rounded transition-colors cursor-pointer"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                      {facebookGroups.length === 0 && (
+                        <p className="text-[10px] text-zinc-600 italic">No Facebook groups configured. Scanning only public Marketplace.</p>
+                      )}
+                    </div>
+                  </div>
 
                   {/* Dispatch Live Test Alert Simulation */}
                   <div className="space-y-2 mt-2">
-                    <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block">Live Endpoint Telegram broadcast checklist:</span>
+                    <span className="text-[10px] text-zinc-550 font-bold uppercase tracking-wider block">Live Endpoint Telegram broadcast checklist:</span>
                     <div className="flex gap-2">
                       <input
                         type="text"
@@ -1335,14 +1479,11 @@ export default function App() {
                       </div>
                     </div>
                   </div>
-
                 </div>
-
                 <div className="mt-4 pt-3 border-t border-zinc-850 text-[10px] text-zinc-550 font-mono">
-                  Daemon target: pavlenkou318@gmail.com subscribers
-                </div>
-              </section>
-
+                    Daemon target: pavlenkou318@gmail.com subscribers
+                  </div>
+                </section>
             </div>
 
           </div>
